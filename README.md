@@ -1,24 +1,29 @@
-Wagtail Developer Reference
+# Wagtail Developer Reference
 
-A plug-and-play auditing tool for Wagtail developers. It provides a visual registry of all Page models and StreamField blocks, tracking their usage across multiple sites.
+**A visual auditing tool for Wagtail developers.** This package provides a live registry of your project's architecture, making it easy to track Page models and StreamField blocks across complex, multi-site setups.
 
-Quick Start
+## Why use this?
+In large Wagtail projects, it’s easy to lose track of where specific blocks are used or which templates are being rendered. This tool gives you a "God-view" of your components without needing to dig through the database or shell.
 
-1. Add wagtail_developer_reference to your INSTALLED_APPS:
-   
+## Features
+* **Usage Tracking:** See exactly how many times a Page type or StreamField block is used across the site.
+* **Template Discovery:** Instantly see the file path for the template associated with every component.
+* **Interactive Audit:** Filter by type or search for specific field names to find where logic is implemented.
+* **Zero-Config:** No extra database tables or complex settings. It inspects your models and content on the fly.
+
+## Installation
+
+1. Add \`wagtail_developer_reference\` to your \`INSTALLED_APPS\`:
+   \`\`\`python
    INSTALLED_APPS = [
        ...,
        "wagtail_developer_reference",
    ]
-   
-2. Login to the Wagtail Admin as a superuser.
-3. Find the System Registry item in the sidebar menu.
+   \`\`\`
 
-Features
-- Live vs Draft Tracking: See exactly how many times a block or page type is being used.
-- Interactive Audit: Filter by type or search for specific field names.
-- Template Discovery: Automatically finds the file path for the template associated with each component.
-- No Configuration Needed: All styling and scripts are bundled inline.
+2. **Usage:**
+   * Login to the Wagtail Admin as a **superuser**.
+   * Find the **"System Registry"** item in the sidebar menu.
 
-License
-MIT
+## License
+**Internal Use Only** - Copyright © 2026 Fourdigits. All rights reserved.
