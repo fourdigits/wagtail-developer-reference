@@ -1,0 +1,164 @@
+{% extends "wagtailadmin/base.html" %}
+{% block titletag %}System Registry{% endblock %}
+
+{% block extra_css %}
+<style>
+    .registry-controls {
+        display: flex; gap: 1rem; margin-bottom: 1.5rem;
+        background-color: #4a4a4a; padding: 1.25rem; border-left: 5px solid #dcbd3d;
+    }
+    .registry-controls div { flex: 1; }
+    .registry-controls label { display: block; font-weight: bold; color: white; margin-bottom: 0.5rem; }
+    .registry-controls input, .registry-controls select {
+        width: 100%; padding: 0.6rem; border: 1px solid #dcbd3d; background: #333; color: white; border-radius: 0;
+    }
+
+    .listing thead tr { border-bottom: 2px solid #dcbd3d; }
+    .col-centered { text-align: center; width: 5rem; }
+    .col-site { width: 10rem; }
+    .col-type { width: 8rem; white-space: nowrap; }
+
+    .sortable { cursor: pointer; position: relative; transition: background 0.2s; }
+    .sortable:hover { background: #444; }
+    .sortable::after {
+        content: '↕';
+        font-size: 0.8rem;
+        margin-left: 5px;
+        opacity: 0.3;
+    }
+
+    .type-tag {
+        background: #222; color: #dcbd3d; border: 1px solid #dcbd3d;
+        padding: 2px 10px; text-transform: uppercase; font-size: 0.7rem;
+        display: inline-block; white-space: nowrap;
+    }
+
+    .field-pill {
+        background: #222; border: 1px solid #dcbd3d; padding: 2px 6px;
+        margin-bottom: 4px; display: inline-block; font-size: 0.75rem;
+    }
+    .field-pill--metadata { border-color: #777; background: #333; }
+
+    .count-draft { color: #dcbd3d; font-weight: bold; }
+    .count-live { color: #1fb53a; font-weight: bold; }
+    .zero-usage { color: #af7f7f; opacity: 0.5; }
+
+    .usage-link { background: #dcbd3d !important; color: #222 !important; font-weight: bold; border-radius: 0; }
+    .template-path { color: #ccc; font-family: monospace; font-size: 0.7rem; cursor: pointer; }
+
+    [data-wagtail-theme="dark"] .listing tbody tr:hover {
+        background-color: #333 !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    {% include "wagtailadmin/shared/header.html" with title="System Registry" icon="code" %}
+    <div class="nice-padding">
+        <div class="registry-controls">
+            <div>
+                <label>Search Registry</label>
+                <input type="text" id="reg-search" placeholder="Filter by name, field or site...">
+            </div>
+            <div id="type-filter-container">
+                <label>Component Type</label>
+                <select id="reg-filter">
+                    <option value="ALL">All</option>
+                    <option value="PAGE">Pages Only</option>
+                    <option value="BLOCK">Blocks Only</option>
+                </select>
+            </div>
+        </div>
+
+        <table class="listing" id="registry-table">
+            <thead>
+                <tr>
+                    <th class="sortable col-site" onclick="sortTable(0)">Site</th>
+                    <th class="sortable" onclick="sortTable(1)">Hierarchy</th>
+                    <th class="sortable col-type" onclick="sortTable(2)">Type</th>
+                    <th class="sortable" onclick="sortTable(3)">Structure & Metadata</th>
+                    <th class="sortable col-centered" onclick="sortTable(4)">Draft</th>
+                    <th class="sortable col-centered" onclick="sortTable(5)">Live</th>
+                    <th class="sortable col-centered" onclick="sortTable(6)">Total</th>
+                    <th class="sortable" onclick="sortTable(7)">Template Path</th>
+                </tr>
+            </thead>
+            <tbody id="registry-body">
+                {% for item in audit_data %}
+                <tr class="registry-row" data-type="{{ item.type|upper }}">
+                    <td class="col-site">{{ item.site_name }}</td>
+                    <td><strong>{{ item.hierarchy }}</strong></td>
+                    <td class="col-type"><span class="type-tag">{{ item.type }}</span></td>
+                    <td>
+                        {% for field_info in item.fields.structure %}
+                            <div class="field-pill"><code>{{ field_info }}</code></div>
+                        {% endfor %}
+                        {% for field_info in item.fields.metadata %}
+                            <div class="field-pill field-pill--metadata"><code>{{ field_info }}</code></div>
+                        {% endfor %}
+                    </td>
+                    <td class="col-centered" data-sort="{{ item.usage.draft }}">
+                        <span class="{% if item.usage.draft > 0 %}count-draft{% else %}zero-usage{% endif %}">{{ item.usage.draft }}</span>
+                    </td>
+                    <td class="col-centered" data-sort="{{ item.usage.live }}">
+                        <span class="{% if item.usage.live > 0 %}count-live{% else %}zero-usage{% endif %}">{{ item.usage.live }}</span>
+                    </td>
+                    <td class="col-centered" data-sort="{{ item.usage.total }}">
+                        {% if item.usage.total > 0 %}
+                            <a href="{% url 'dev_usage_detail' item.type item.clean_name %}?site={{ item.site_name }}" class="button button-small usage-link">
+                                {{ item.usage.total }}
+                            </a>
+                        {% else %}
+                            <span class="zero-usage">0</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <small class="template-path" onclick="navigator.clipboard.writeText(this.textContent.trim())">
+                            {{ item.template }}
+                        </small>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        let currentSortColumn = -1;
+        let isSortAscending = true;
+
+        function sortTable(columnIndex) {
+            const tableBody = document.getElementById("registry-body");
+            const tableRows = Array.from(tableBody.querySelectorAll(".registry-row"));
+
+            isSortAscending = (currentSortColumn === columnIndex) ? !isSortAscending : true;
+            currentSortColumn = columnIndex;
+
+            tableRows.sort((rowA, rowB) => {
+                let cellA = rowA.cells[columnIndex];
+                let cellB = rowB.cells[columnIndex];
+                let valueA = cellA.getAttribute('data-sort') || cellA.textContent.trim().toLowerCase();
+                let valueB = cellB.getAttribute('data-sort') || cellB.textContent.trim().toLowerCase();
+
+                if (!isNaN(parseFloat(valueA)) && isFinite(valueA) && !isNaN(parseFloat(valueB)) && isFinite(valueB)) {
+                    return isSortAscending ? valueA - valueB : valueB - valueA;
+                }
+                return isSortAscending ? valueA.localeCompare(valueB) : valueB.localeCompare(valueA);
+            }).forEach(sortedRow => tableBody.appendChild(sortedRow));
+        }
+
+        function runFilters() {
+            const searchTerm = document.getElementById('reg-search').value.toLowerCase();
+            const filterValue = document.getElementById('reg-filter').value;
+            document.querySelectorAll('.registry-row').forEach(row => {
+                const textMatches = row.textContent.toLowerCase().includes(searchTerm);
+                const rowType = row.getAttribute('data-type');
+                const typeMatches = (filterValue === 'ALL') || (rowType === filterValue);
+                row.style.display = (textMatches && typeMatches) ? '' : 'none';
+            });
+        }
+
+        document.getElementById('reg-search').addEventListener('input', runFilters);
+        document.getElementById('reg-filter').addEventListener('change', runFilters);
+    </script>
+{% endblock %}
