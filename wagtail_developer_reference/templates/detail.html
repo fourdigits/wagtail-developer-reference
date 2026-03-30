@@ -1,0 +1,184 @@
+{% extends "wagtailadmin/base.html" %}
+
+{% block titletag %}Usage: {{ component_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .registry-header {
+        border-bottom: 0.3125rem solid #dcbd3d;
+        background-color: #222 !important;
+        padding: 1.25rem;
+    }
+
+    .registry-header h1 { color: white; margin: 0; }
+    .registry-header strong { color: #dcbd3d; }
+    .registry-header .breadcrumb { margin-bottom: 0.625rem; }
+
+    .registry-header .breadcrumb a {
+        color: #dcbd3d;
+        text-decoration: none;
+        font-weight: bold;
+        font-size: 0.9rem;
+    }
+
+    .registry-header p { color: #ccc; margin-top: 0.3125rem; }
+
+    .listing thead tr {
+        border-bottom: 0.125rem solid #dcbd3d;
+        background-color: #333;
+    }
+
+    .listing th { color: white !important; }
+
+    .listing thead th.sortable {
+        cursor: pointer;
+        position: relative;
+        transition: background-color 0.2s;
+    }
+
+    .listing thead th.sortable:hover { background-color: #444; }
+
+    .listing thead th.sortable::after {
+        content: '↕';
+        font-size: 0.8rem;
+        margin-left: 0.3125rem;
+        opacity: 0.3;
+    }
+
+    .col-status { width: 7.5rem; }
+    .col-actions { text-align: right; }
+    .listing tbody tr { border-bottom: 0.0625rem solid #444; }
+    .td-status { white-space: nowrap; vertical-align: middle; }
+
+    .page-title { color: white; font-size: 1.1rem; display: block; }
+    .page-type { color: #aaa; }
+
+    .status-tag {
+        color: #222222 !important;
+        border-radius: 0;
+        padding: 0.25rem 0.625rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        display: inline-block;
+        min-width: 4.0625rem;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .status-tag--live { background-color: #8cf81f; }
+    .status-tag--draft { background-color: #eeb300; }
+
+    .url-code {
+        color: white;
+        background: #000;
+        border: 0.0625rem solid #555;
+        padding: 0.25rem 0.5rem;
+    }
+
+    .edit-button {
+        background-color: #222222 !important;
+        color: #ffffff !important;
+        border: 0.0625rem solid #dcbd3d !important;
+        border-radius: 0;
+        transition: all 0.2s ease;
+    }
+
+    .edit-button:hover {
+        background-color: #dcbd3d !important;
+        color: #222222 !important;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3.75rem;
+        color: white;
+        background-color: #111;
+    }
+
+    .empty-state p { font-size: 1.2rem; }
+
+    [data-wagtail-theme="dark"] .listing tbody tr:hover {
+        background-color: #333 !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+  <header class="merged registry-header">
+    <div class="left">
+      <div class="breadcrumb">
+        <a href="{% url 'dev_reference' %}">&larr; Back to System Registry</a>
+      </div>
+      <h1>Locations for: <strong>{{ component_name }}</strong></h1>
+      <p>Found in {{ pages|length }} location{{ pages|length|pluralize }}</p>
+    </div>
+  </header>
+
+  <div class="nice-padding">
+    <table class="listing" id="usage-table">
+      <thead>
+        <tr>
+          <th class="sortable" onclick="sortTable(0)">Page Title</th>
+          <th class="sortable col-status" onclick="sortTable(1)">Status</th>
+          <th class="sortable" onclick="sortTable(2)">URL Path</th>
+          <th class="col-actions">Action</th>
+        </tr>
+      </thead>
+      <tbody id="usage-body">
+        {% for page in pages %}
+          <tr class="usage-row">
+            <td>
+              <strong class="page-title">{{ page.title }}</strong>
+              <small class="page-type">Type: {{ page.get_verbose_name }}</small>
+            </td>
+            <td class="td-status" data-sort="{% if page.live %}1{% else %}0{% endif %}">
+              <span class="status-tag status-tag--{% if page.live %}live{% else %}draft{% endif %}">
+                {% if page.live %}Live{% else %}Draft{% endif %}
+              </span>
+            </td>
+            <td><code class="url-code">{{ page.url|default:"/(no slug)/" }}</code></td>
+            <td class="col-actions">
+              <a href="{% url 'wagtailadmin_pages:edit' page.id %}" class="button button-small edit-button" target="_blank">Edit Page</a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="4" class="empty-state">
+              <p>No pages found using this component.</p>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    let currentSortCol = -1;
+    let sortAsc = true;
+
+    function sortTable(colIdx) {
+        const tbody = document.getElementById("usage-body");
+        const rows = Array.from(tbody.querySelectorAll(".usage-row"));
+
+        if (currentSortCol === colIdx) {
+            sortAsc = !sortAsc;
+        } else {
+            sortAsc = true;
+            currentSortCol = colIdx;
+        }
+
+        rows.sort((a, b) => {
+            let valA, valB;
+            if (colIdx === 1) {
+                valA = parseInt(a.cells[colIdx].getAttribute('data-sort'));
+                valB = parseInt(b.cells[colIdx].getAttribute('data-sort'));
+                return sortAsc ? valA - valB : valB - valueA;
+            }
+            valA = a.cells[colIdx].textContent.trim().toLowerCase();
+            valB = b.cells[colIdx].textContent.trim().toLowerCase();
+            return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        }).forEach(row => tbody.appendChild(row));
+    }
+  </script>
+{% endblock %}

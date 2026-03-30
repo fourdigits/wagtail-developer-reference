@@ -1,0 +1,15 @@
+cat <<EOF > .gitignore
+# Python build/dist files
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.py[cod]
+
+# Local development
+.venv/
+.env
+.idea/
+.vscode/
+EOF
+.idea/
