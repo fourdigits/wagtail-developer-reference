@@ -1,6 +1,6 @@
 [project]
 name = "wagtail-developer-reference"
-version = "0.1.0"
+version = "1.0.0"
 description = "A visual auditing tool for Wagtail developers to track Page models and StreamField blocks."
 readme = "README.md"
 authors = [{name = "Four Digits", email = "info@fourdigits.nl" }]
@@ -20,7 +20,7 @@ keywords = ["django", "wagtail", "audit", "streamfield"]
 dependencies = [
     "wagtail>=4.1",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.0"
 
 [project.optional-dependencies]
 dev = [
@@ -44,7 +44,7 @@ include = ["wagtail_developer_reference*"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py310"
+target-version = "py38"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
