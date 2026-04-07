@@ -5,6 +5,7 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import render
 from django.template.loader import get_template
 from django.urls import path
+from django.urls import reverse
 from wagtail import hooks
 from wagtail.admin.menu import MenuItem
 from wagtail.blocks import StructBlock
@@ -182,4 +183,5 @@ def register_admin_urls():
 
 @hooks.register("register_admin_menu_item")
 def register_menu():
-    return MenuItem("System Registry", "/admin/developer-reference/", icon_name="code", order=10000)
+    url = reverse("dev_reference")
+    return MenuItem("System Registry", url, icon_name="code", order=10000)
