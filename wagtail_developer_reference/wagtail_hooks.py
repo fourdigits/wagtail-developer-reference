@@ -181,7 +181,12 @@ def register_admin_urls():
     ]
 
 
+class SuperuserMenuItem(MenuItem):
+    def is_shown(self, request):
+        return request.user.is_superuser
+
+
 @hooks.register("register_admin_menu_item")
 def register_menu():
     url = reverse("dev_reference")
-    return MenuItem("System Registry", url, icon_name="code", order=10000)
+    return SuperuserMenuItem("System Registry", url, icon_name="code", order=10000)
