@@ -1,6 +1,6 @@
 [project]
 name = "wagtail-developer-reference"
-version = "0.1.0"
+version = "0.1.1"
 description = "A visual auditing tool for Wagtail developers to track Page models and StreamField blocks."
 readme = "README.md"
 authors = [{name = "Four Digits", email = "info@fourdigits.nl" }]
