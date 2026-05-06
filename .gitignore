@@ -1,4 +1,3 @@
-cat <<EOF > .gitignore
 # Python build/dist files
 build/
 dist/
@@ -11,5 +10,13 @@ __pycache__/
 .env
 .idea/
 .vscode/
-EOF
-.idea/
+
+# Optional repo-local Wagtail Bakery demo checkouts.
+/.wdr-bakerydemo/
+/bakerydemo/
+/test-bakerydemo/
+/wagtail-developer-reference-bakerydemo/
+
+# Local-only Bakery demo helper scripts.
+/scripts/test-bakery*.sh
+/test-bakery*.sh
