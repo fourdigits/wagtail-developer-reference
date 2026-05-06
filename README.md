@@ -13,6 +13,9 @@ In large Wagtail projects, it’s easy to lose track of where specific blocks ar
 
 ## Installation
 
+Compatibility: Python 3.9+ and Wagtail 4.1 through 7.4 LTS. Wagtail 7.4
+itself requires Python 3.10+.
+
 1. Add \`wagtail_developer_reference\` to your \`INSTALLED_APPS\`:
    \`\`\`python
    INSTALLED_APPS = [
@@ -21,9 +24,24 @@ In large Wagtail projects, it’s easy to lose track of where specific blocks ar
    ]
    \`\`\`
 
-2. **Usage:**
-   * Login to the Wagtail Admin as a **superuser**.
+2. Run migrations so Django creates the package permission:
+   ```bash
+   python manage.py migrate
+   ```
+
+3. Grant access in the Django admin:
+   * Open a user or group in the Django admin.
+   * Assign **Wagtail developer reference | developer reference access | Can access the
+     Wagtail developer reference**.
+
+4. **Usage:**
+   * Login to the Wagtail Admin with an account that has that permission explicitly
+     assigned.
    * Find the **"System Registry"** item in the sidebar menu.
+
+By default, no account can see the menu item or access the URLs. Superusers are not
+granted access automatically by this package; assign the permission directly or
+through a group.
 
 ## License
 **Internal Use Only** - Copyright © 2026 Fourdigits. All rights reserved.
