@@ -1,25 +1,24 @@
+# ruff: noqa: E501
 from __future__ import annotations
 
 import inspect
 from collections.abc import Iterable
-from typing import Any, Literal, TypedDict
+from pathlib import Path
+from typing import Any, Literal, NotRequired, TypedDict
 
 from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import PermissionDenied
-from django.db.models import Field
+from django.core.paginator import Paginator
+from django.db.models import Field, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.template.loader import get_template
-from django.urls import path
-from django.urls import reverse
+from django.urls import path, reverse
 from django.urls.resolvers import URLPattern
 from wagtail import hooks
 from wagtail.admin.menu import MenuItem
-from wagtail.blocks import StructBlock
 from wagtail.fields import StreamField
-from wagtail.models import Page
-from wagtail.models import Site, get_page_models
-
+from wagtail.models import Page, Site, get_page_models
 
 ACCESS_PERMISSION_APP_LABEL: str = "wagtail_developer_reference"
 ACCESS_PERMISSION_CODENAME: str = "access_developer_reference"
@@ -34,19 +33,27 @@ class UsageData(TypedDict):
     draft: int
 
 
+class FieldInfo(TypedDict):
+    label: str
+    type: str
+    block_name: NotRequired[str | None]
+
+
 class FieldGroups(TypedDict):
-    structure: list[str]
-    metadata: list[str]
+    structure: list[FieldInfo]
+    metadata: list[FieldInfo]
 
 
 class AuditItem(TypedDict):
+    site_id: int
     site_name: str
     hierarchy: str
     clean_name: str
     type: ComponentType
     fields: FieldGroups
     usage: UsageData
-    template: str
+    template: str | None
+    template_label: str | None
 
 
 def user_can_access_developer_reference(user: Any) -> bool:
@@ -99,38 +106,35 @@ class WagtailAuditor:
             "latest_revision_created_at",
         }
 
-    def get_template_path(self, template_name: str | None) -> str:
+    def get_template_path(self, template_name: str | None) -> str | None:
         if not template_name:
-            return "Default Rendering"
+            return None
         try:
             return get_template(template_name).origin.name
         except Exception:
-            return "Template not found"
+            return template_name
 
-    def _analyze_model_field(
-        self,
-        field: Field[Any, Any],
-    ) -> tuple[str | None, FieldCategory | None]:
-        if field.name in self.excluded_fields:
+    def get_template_label(self, template_path: str | None) -> str | None:
+        return Path(template_path).name if template_path else None
+
+
+    def _analyze_model_field(self, field: Field[Any, Any]) -> tuple[FieldInfo | None, FieldCategory | None]:
+        if field.name in self.excluded_fields or (field.is_relation and not field.many_to_one):
             return None, None
-        if not field.is_relation or field.many_to_one:
-            label = getattr(field, "verbose_name", field.name)
-            if hasattr(label, "__str__"):
-                label = str(label).capitalize()
-            field_type = type(field).__name__
-            is_structure = "StreamField" in field_type or "RichTextField" in field_type
-            category = "structure" if is_structure else "metadata"
-            return f"{label} ({field_type})", category
-        return None, None
+        field_type = type(field).__name__
+        category: FieldCategory = "structure" if isinstance(field, StreamField) or "RichTextField" in field_type else "metadata"
+        return {"label": str(getattr(field, "verbose_name", field.name)).capitalize(), "type": field_type}, category
 
     def get_internal_structure(self, object_instance: Any) -> FieldGroups:
-        structure_fields: list[str] = []
-        metadata_fields: list[str] = []
+        structure_fields: list[FieldInfo] = []
+        metadata_fields: list[FieldInfo] = []
 
         if hasattr(object_instance, "child_blocks"):
             for name, block in object_instance.child_blocks.items():
-                label = getattr(block.meta, "label", name)
-                structure_fields.append(f"{label} ({type(block).__name__})")
+                label = getattr(block.meta, "label", None) or name
+                structure_fields.append(
+                    {"label": str(label), "type": type(block).__name__}
+                )
         elif hasattr(object_instance, "_meta"):
             for field in object_instance._meta.get_fields():
                 info, category = self._analyze_model_field(field)
@@ -172,64 +176,44 @@ class WagtailAuditor:
             "draft": total_count - live_count,
         }
 
-    def process_block(
-        self,
-        block_name: str,
-        block_object: Any,
-        parent_label: str,
-        site: Site,
-    ) -> None:
+    def process_block(self, block_name: str, block_object: Any, parent_label: str, site: Site, include_usage: bool = False) -> None:
         is_class = inspect.isclass(block_object)
-        block_class = (
-            block_object.__name__ if is_class else block_object.__class__.__name__
-        )
-        signature = f"{site.id}_{block_class}_{block_name}"
+        block_class = block_object.__name__ if is_class else block_object.__class__.__name__
+        signature = f"{site.id}_{parent_label}_{block_class}_{block_name}"
         if signature in self.seen_blocks:
             return
-
-        site_usage = {"live": 0, "total": 0, "draft": 0}
-        for model in self.models_with_streamfields:
-            usage_data = self._get_usage_for_site(model, site, block_name)
-            site_usage["live"] += usage_data["live"]
-            site_usage["total"] += usage_data["total"]
-            site_usage["draft"] += usage_data["draft"]
-
-        block_label = str(getattr(block_object.meta, "label", block_name))
-        self.results.append(
-            {
-                "site_name": str(site),
-                "hierarchy": f"{parent_label} → {block_label}",
-                "clean_name": block_name,
-                "type": "BLOCK",
-                "fields": self.get_internal_structure(block_object),
-                "usage": site_usage,
-                "template": self.get_template_path(
-                    getattr(block_object.meta, "template", None)
-                ),
-            }
-        )
+        block_label = str(getattr(block_object.meta, "label", None) or block_name)
+        template_path = self.get_template_path(getattr(block_object.meta, "template", None))
+        usage = {"live": 0, "total": 0, "draft": 0}
+        if include_usage:
+            for model in self.models_with_streamfields:
+                model_usage = self._get_usage_for_site(model, site, block_name)
+                for key in usage:
+                    usage[key] += model_usage[key]
+        self.results.append({"site_id": site.id, "site_name": site.site_name, "hierarchy": f"{parent_label} → {block_label}", "clean_name": block_name, "type": "BLOCK", "fields": self.get_internal_structure(block_object), "usage": usage, "template": template_path, "template_label": self.get_template_label(template_path)})
         self.seen_blocks.add(signature)
+        for child_name, child_object in getattr(block_object, "child_blocks", {}).items():
+            self.process_block(child_name, child_object, f"{parent_label} → {block_label}", site, include_usage)
 
-        if isinstance(block_object, StructBlock):
-            for child_name, child_object in block_object.child_blocks.items():
-                self.process_block(child_name, child_object, parent_label, site)
-
-    def run(self) -> list[AuditItem]:
+    def run(self, include_usage: bool = False) -> list[AuditItem]:
         for site in self.sites:
             for model in self.all_page_models:
-                usage_data = self._get_usage_for_site(model, site)
+                usage_data = self._get_usage_for_site(model, site) if include_usage else {"live": 0, "total": 0, "draft": 0}
                 default_tpl = f"{model._meta.app_label}/{model._meta.model_name}.html"
+                template_path = self.get_template_path(
+                    getattr(model, "template", default_tpl)
+                )
                 self.results.append(
                     {
-                        "site_name": str(site),
+                        "site_id": site.id,
+                        "site_name": site.site_name,
                         "hierarchy": str(model._meta.verbose_name).title(),
                         "clean_name": model.__name__,
                         "type": "PAGE",
                         "fields": self.get_internal_structure(model),
                         "usage": usage_data,
-                        "template": self.get_template_path(
-                            getattr(model, "template", default_tpl)
-                        ),
+                        "template": template_path,
+                        "template_label": self.get_template_label(template_path),
                     }
                 )
                 for field in model._meta.get_fields():
@@ -241,19 +225,45 @@ class WagtailAuditor:
                                 block_object,
                                 str(model._meta.verbose_name).title(),
                                 site,
+                                include_usage,
                             )
         return self.results
 
 
 @user_passes_test(require_developer_reference_access)
 def developer_reference_view(request: HttpRequest) -> HttpResponse:
+    applied = request.GET.get("apply") == "1"
     auditor = WagtailAuditor()
-    audit_results = auditor.run()
-    sorted_results = sorted(
-        audit_results,
-        key=lambda item: (item["site_name"], item["hierarchy"]),
-    )
-    return render(request, "index.html", {"audit_data": sorted_results})
+    audit_results = auditor.run(include_usage=applied)
+    quick_search_by_component = {}
+    for item in audit_results:
+        key = (item["type"], item["hierarchy"])
+        quick_search_by_component.setdefault(key, (item["type"], item["hierarchy"], item["hierarchy"]))
+    quick_search_items = sorted(quick_search_by_component.values(), key=lambda item: (item[2].casefold(), item[0]))
+    filters = {"q": request.GET.get("q", "").strip(), "type": request.GET.get("type", "ALL"), "site": request.GET.get("site", ""), "min_usage": request.GET.get("min_usage", ""), "max_usage": request.GET.get("max_usage", "")}
+    error = ""
+    filtered_results: list[AuditItem] = []
+    if applied:
+        try:
+            minimum = int(filters["min_usage"]) if filters["min_usage"] else None
+            maximum = int(filters["max_usage"]) if filters["max_usage"] else None
+            if (minimum is not None and minimum < 0) or (maximum is not None and maximum < 0) or (minimum is not None and maximum is not None and minimum > maximum):
+                raise ValueError
+        except ValueError:
+            error = "Usage range must contain non-negative numbers, with min no greater than max."
+            minimum = maximum = None
+        if not error:
+            query = filters["q"].casefold()
+            for item in audit_results:
+                matches_query = not query or query in " ".join((item["site_name"], item["hierarchy"], item["clean_name"])).casefold()
+                matches_type = filters["type"] == "ALL" or item["type"] == filters["type"]
+                matches_site = not filters["site"] or str(item["site_id"]) == filters["site"]
+                total = item["usage"]["total"]
+                matches_min = minimum is None or total >= minimum
+                matches_max = maximum is None or total <= maximum
+                if matches_query and matches_type and matches_site and matches_min and matches_max:
+                    filtered_results.append(item)
+    return render(request, "index.html", {"audit_data": sorted(filtered_results, key=lambda item: (item["site_name"], item["hierarchy"])), "quick_search_items": quick_search_items, "sites": Site.objects.order_by("site_name", "id"), "filters": filters, "is_applied": applied, "filter_error": error})
 
 
 @user_passes_test(require_developer_reference_access)
@@ -262,17 +272,28 @@ def developer_usage_detail_view(
     component_type: str,
     component_name: str,
 ) -> HttpResponse:
-    site_filter_name = request.GET.get("site")
-    found_pages: list[Page] = []
+    site_filter = request.GET.get("site")
+    site = Site.objects.filter(pk=site_filter).first()
+    pages = Page.objects.none()
+
+    # Do not load every matching page into Python. Scope the query to the site
+    # and let the database return only the current results page.
+    if site_filter:
+        site_pages = (
+            Page.objects.descendant_of(site.root_page) if site else Page.objects.none()
+        )
+    else:
+        site_pages = Page.objects.all()
     if component_type == "PAGE":
         target_model = next(
             (model for model in get_page_models() if model.__name__ == component_name),
             None,
         )
         if target_model:
-            found_pages = list(target_model.objects.all())
+            pages = site_pages.filter(pk__in=target_model.objects.values("pk"))
     else:
         search_key = f'"{component_name}"'
+        component_filter = Q()
         for model in get_page_models():
             stream_fields = [
                 f.name
@@ -280,28 +301,31 @@ def developer_usage_detail_view(
                 if isinstance(f, StreamField)
             ]
             for field_name in stream_fields:
-                found_pages.extend(
-                    list(
-                        model.objects.filter(
-                            **{f"{field_name}__icontains": search_key}
-                        )
-                    )
+                component_filter |= Q(
+                    pk__in=model.objects.filter(
+                        **{f"{field_name}__icontains": search_key}
+                    ).values("pk")
                 )
+        if component_filter:
+            pages = site_pages.filter(component_filter)
 
-    if site_filter_name:
-        found_pages = [
-            page
-            for page in found_pages
-            if str(page.get_site()) == site_filter_name
-        ]
+    search_query = request.GET.get("q", "").strip()
+    if search_query:
+        pages = pages.filter(
+            Q(title__icontains=search_query) | Q(slug__icontains=search_query)
+        )
 
-    unique_pages = {page.id: page for page in found_pages}.values()
+    paginator = Paginator(pages.order_by("title", "pk").distinct(), 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
     return render(
         request,
         "detail.html",
         {
             "component_name": component_name,
-            "pages": unique_pages,
+            "pages": page_obj,
+            "page_obj": page_obj,
+            "search_query": search_query,
+            "site_filter": site_filter or "",
         },
     )
 

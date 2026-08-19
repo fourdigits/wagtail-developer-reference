@@ -6,15 +6,16 @@
 In large Wagtail projects, it’s easy to lose track of where specific blocks are used or which templates are being rendered. This tool gives you a "God-view" of your components without needing to dig through the database or shell.
 
 ## Features
-* **Usage Tracking:** See exactly how many times a Page type or StreamField block is used across the site.
-* **Template Discovery:** Instantly see the file path for the template associated with every component.
-* **Interactive Audit:** Filter by type or search for specific field names to find where logic is implemented.
-* **Zero-Config:** No extra database tables or complex settings. It inspects your models and content on the fly.
+* **On-demand usage tracking:** Apply filters before calculating page and block usage, keeping the registry quick to open.
+* **Interactive registry:** Combine text, PAGE/BLOCK, site and total-usage-range filters to find exactly the components you need.
+* **Nested block discovery:** Browse visible block labels and full nested definition paths, with safe fallbacks for unlabeled blocks.
+* **Usage inspection:** Search and paginate matching pages, then copy the visible usage table in one click.
+* **Template discovery:** See the template path associated with every component.
 
 ## Installation
 
-Compatibility: Python 3.9+ and Wagtail 4.1 through 7.4 LTS. Wagtail 7.4
-itself requires Python 3.10+.
+Compatibility: Python 3.9+ and Wagtail 4.1 through 7.4.2 LTS (the latest
+stable Wagtail release at v0.1.3). Wagtail 7.4 itself requires Python 3.10+.
 
 1. Add \`wagtail_developer_reference\` to your \`INSTALLED_APPS\`:
    \`\`\`python

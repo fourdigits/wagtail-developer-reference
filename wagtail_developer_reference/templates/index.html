@@ -6,14 +6,46 @@
     .registry-controls {
         display: flex; gap: 1rem; margin-bottom: 1.5rem;
         background-color: #4a4a4a; padding: 1.25rem; border-left: 5px solid #dcbd3d;
+        align-items: end;
     }
-    .registry-controls div { flex: 1; }
+    .registry-controls { flex-wrap: wrap; }
+    .registry-controls div { flex: 1 1 10rem; }
+    .registry-controls .registry-search { flex: 3 1 20rem; }
+    .registry-controls .usage-range { flex: 0 1 6rem; }
+    .registry-controls .filter-actions {
+        align-items: end; display: flex; flex: 0 0 auto; gap: 0.5rem;
+    }
+    .registry-controls .filter-actions .button { margin: 0; white-space: nowrap; }
+    .quick-search {
+        background: #333; border-left: 5px solid #dcbd3d; margin-bottom: 1rem;
+    }
+    .quick-search summary {
+        color: white; cursor: pointer; font-weight: bold; padding: 0.9rem 1.25rem;
+    }
+    .quick-search-filter {
+        box-sizing: border-box; margin: 0 1.25rem 0.75rem; max-width: 34rem;
+        min-height: 2.5rem; padding: 0.5rem; width: calc(100% - 2.5rem);
+    }
+    .quick-search-status { color: #ccc; display: block; font-size: 0.85rem; padding: 0 1.25rem 0.75rem; }
+    .quick-search-list {
+        display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0 1.25rem 1.25rem;
+    }
+    .quick-search-item {
+        background: #222; border: 1px solid #777; color: white; cursor: pointer;
+        font: inherit; padding: 0.35rem 0.5rem; text-align: left;
+    }
+    .quick-search-item:hover, .quick-search-item:focus {
+        border-color: #dcbd3d; color: #dcbd3d;
+    }
+    .quick-search-item .type-tag { margin-right: 0.35rem; }
     .registry-controls label { display: block; font-weight: bold; color: white; margin-bottom: 0.5rem; }
     .registry-controls input, .registry-controls select {
-        width: 100%; padding: 0.6rem; border: 1px solid #dcbd3d; background: #333; color: white; border-radius: 0;
+        box-sizing: border-box; height: 2.5rem; width: 100%;
+        border: 1px solid #dcbd3d; background: #333; color: white; border-radius: 0;
     }
 
     .listing thead tr { border-bottom: 2px solid #dcbd3d; }
+    .listing tbody td { vertical-align: top; }
     .col-centered { text-align: center; width: 5rem; }
     .col-site { width: 10rem; }
     .col-type { width: 8rem; white-space: nowrap; }
@@ -31,20 +63,48 @@
         background: #222; color: #dcbd3d; border: 1px solid #dcbd3d;
         padding: 2px 10px; text-transform: uppercase; font-size: 0.7rem;
         display: inline-block; white-space: nowrap;
+        cursor: default; pointer-events: none;
     }
+    .type-tag--page { background: #153a5b; border-color: #5db6ff; color: #b9e2ff; }
+    .type-tag--block { background: #3c2459; border-color: #bf8cff; color: #e2c8ff; }
 
     .field-pill {
         background: #222; border: 1px solid #dcbd3d; padding: 2px 6px;
-        margin-bottom: 4px; display: inline-block; font-size: 0.75rem;
+        display: inline-block; font-size: 0.75rem; white-space: nowrap;
     }
     .field-pill--metadata { border-color: #777; background: #333; }
+    .field-type { color: #aaa; font-size: 0.8em; }
+
+    .field-toggle {
+        background: #222;
+        border: 1px solid #dcbd3d;
+        color: #dcbd3d;
+        cursor: pointer;
+        font-size: 0.75rem;
+        padding: 0.3rem 0.5rem;
+        text-align: left;
+    }
+    .field-toggle:hover { background: #333; }
+    .field-toggle::before { content: "▸"; margin-right: 0.4rem; }
+    .field-toggle[aria-expanded="true"]::before { content: "▾"; }
+    .field-cell { position: relative; }
+    .field-details {
+        align-items: flex-start; background: #222; border: 1px solid #dcbd3d;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.35); display: flex;
+        flex-wrap: wrap; gap: 0.25rem; left: 0; margin-top: 0.5rem;
+        max-width: 36rem; min-width: 20rem; padding: 0.5rem; position: absolute;
+        top: 100%; z-index: 10;
+    }
+    .field-details[hidden] { display: none; }
 
     .count-draft { color: #dcbd3d; font-weight: bold; }
     .count-live { color: #1fb53a; font-weight: bold; }
     .zero-usage { color: #af7f7f; opacity: 0.5; }
 
     .usage-link { background: #dcbd3d !important; color: #222 !important; font-weight: bold; border-radius: 0; }
-    .template-path { color: #ccc; font-family: monospace; font-size: 0.7rem; cursor: pointer; }
+    .template-label { color: #ccc; font-family: monospace; font-size: 0.7rem; }
+    .template-copy { margin-left: 0.35rem; padding: 0.15rem 0.35rem; }
+    .template-empty { color: #aaa; }
 
     [data-wagtail-theme="dark"] .listing tbody tr:hover {
         background-color: #333 !important;
@@ -55,21 +115,29 @@
 {% block content %}
     {% include "wagtailadmin/shared/header.html" with title="System Registry" icon="code" %}
     <div class="nice-padding">
-        <div class="registry-controls">
-            <div>
-                <label>Search Registry</label>
-                <input type="text" id="reg-search" placeholder="Filter by name, field or site...">
+        <details class="quick-search">
+            <summary>Browse pages and blocks</summary>
+            <input id="quick-search-filter" class="quick-search-filter" type="search" placeholder="Search pages and blocks..." autocomplete="off">
+            <span id="quick-search-status" class="quick-search-status" aria-live="polite"></span>
+            <div class="quick-search-list" aria-label="Quick registry search">
+                {% for component_type, component_name, display_name in quick_search_items %}
+                    <button type="button" class="quick-search-item" data-search="{{ component_name }}" data-type="{{ component_type }}" data-quick-search="{{ component_name }} {{ display_name }}" data-quick-index="{{ forloop.counter0 }}">
+                        <span class="type-tag type-tag--{{ component_type|lower }}">{{ component_type }}</span>{{ display_name }}
+                    </button>
+                {% endfor %}
             </div>
-            <div id="type-filter-container">
-                <label>Component Type</label>
-                <select id="reg-filter">
-                    <option value="ALL">All</option>
-                    <option value="PAGE">Pages Only</option>
-                    <option value="BLOCK">Blocks Only</option>
-                </select>
-            </div>
-        </div>
-
+        </details>
+        <form id="registry-filter-form" method="get" class="registry-controls">
+            <input type="hidden" name="apply" value="1">
+            <div class="registry-search"><label for="reg-search">Search Registry</label><input type="search" id="reg-search" name="q" value="{{ filters.q }}" placeholder="Name, field or site..."></div>
+            <div><label for="reg-filter">Component Type</label><select id="reg-filter" name="type"><option value="ALL" {% if filters.type == "ALL" %}selected{% endif %}>All</option><option value="PAGE" {% if filters.type == "PAGE" %}selected{% endif %}>Pages</option><option value="BLOCK" {% if filters.type == "BLOCK" %}selected{% endif %}>Blocks</option></select></div>
+            <div><label for="reg-site-filter">Site</label><select id="reg-site-filter" name="site"><option value="">All sites</option>{% for site in sites %}<option value="{{ site.id }}" {% if filters.site == site.id|stringformat:"s" %}selected{% endif %}>{{ site.site_name }}</option>{% endfor %}</select></div>
+            <div class="usage-range"><label for="min-usage">Min usage</label><input id="min-usage" type="number" min="0" name="min_usage" value="{{ filters.min_usage }}"></div>
+            <div class="usage-range"><label for="max-usage">Max usage</label><input id="max-usage" type="number" min="0" name="max_usage" value="{{ filters.max_usage }}"></div>
+            <div class="filter-actions"><button type="submit" class="button">Apply Filters</button><a class="button button-secondary" href="{% url 'dev_reference' %}">Clear</a></div>
+        </form>
+        {% if filter_error %}<p class="error-message">{{ filter_error }}</p>{% endif %}
+        {% if is_applied %}
         <table class="listing" id="registry-table">
             <thead>
                 <tr>
@@ -85,17 +153,31 @@
             </thead>
             <tbody id="registry-body">
                 {% for item in audit_data %}
-                <tr class="registry-row" data-type="{{ item.type|upper }}">
+                <tr class="registry-row" data-type="{{ item.type|upper }}" data-site="{{ item.site_id }}">
                     <td class="col-site">{{ item.site_name }}</td>
                     <td><strong>{{ item.hierarchy }}</strong></td>
-                    <td class="col-type"><span class="type-tag">{{ item.type }}</span></td>
-                    <td>
-                        {% for field_info in item.fields.structure %}
-                            <div class="field-pill"><code>{{ field_info }}</code></div>
-                        {% endfor %}
-                        {% for field_info in item.fields.metadata %}
-                            <div class="field-pill field-pill--metadata"><code>{{ field_info }}</code></div>
-                        {% endfor %}
+                    <td class="col-type"><span class="type-tag type-tag--{{ item.type|lower }}">{{ item.type }}</span></td>
+                    <td class="field-cell">
+                        <button
+                            type="button"
+                            class="field-toggle"
+                            aria-expanded="false"
+                            aria-controls="field-details-{{ forloop.counter }}"
+                        >
+                            S: {{ item.fields.structure|length }} · M: {{ item.fields.metadata|length }}
+                        </button>
+                        <div id="field-details-{{ forloop.counter }}" class="field-details" hidden>
+                            {% for field_info in item.fields.structure %}
+                                <div class="field-pill">
+                                    <code>{{ field_info.label }} <small class="field-type">({{ field_info.type }})</small></code>
+                                </div>
+                            {% endfor %}
+                            {% for field_info in item.fields.metadata %}
+                                <div class="field-pill field-pill--metadata">
+                                    <code>{{ field_info.label }} <small class="field-type">({{ field_info.type }})</small></code>
+                                </div>
+                            {% endfor %}
+                        </div>
                     </td>
                     <td class="col-centered" data-sort="{{ item.usage.draft }}">
                         <span class="{% if item.usage.draft > 0 %}count-draft{% else %}zero-usage{% endif %}">{{ item.usage.draft }}</span>
@@ -105,7 +187,7 @@
                     </td>
                     <td class="col-centered" data-sort="{{ item.usage.total }}">
                         {% if item.usage.total > 0 %}
-                            <a href="{% url 'dev_usage_detail' item.type item.clean_name %}?site={{ item.site_name }}" class="button button-small usage-link">
+                            <a href="{% url 'dev_usage_detail' item.type item.clean_name %}?site={{ item.site_id }}" class="button button-small usage-link">
                                 {{ item.usage.total }}
                             </a>
                         {% else %}
@@ -113,14 +195,20 @@
                         {% endif %}
                     </td>
                     <td>
-                        <small class="template-path" onclick="navigator.clipboard.writeText(this.textContent.trim())">
-                            {{ item.template }}
-                        </small>
+                        {% if item.template %}
+                            <span class="template-label" title="{{ item.template }}">{{ item.template_label }}</span>
+                            <button type="button" class="template-copy" data-template="{{ item.template }}">Copy</button>
+                        {% else %}
+                            <span class="template-empty">—</span>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        {% else %}
+            <p class="help-block">Choose filters and select <strong>Apply Filters</strong> to load registry usage.</p>
+        {% endif %}
     </div>
 
     <script>
@@ -148,17 +236,78 @@
         }
 
         function runFilters() {
-            const searchTerm = document.getElementById('reg-search').value.toLowerCase();
-            const filterValue = document.getElementById('reg-filter').value;
-            document.querySelectorAll('.registry-row').forEach(row => {
+            const searchTerm = document.getElementById("reg-search").value.toLowerCase();
+            const typeFilter = document.getElementById("reg-filter").value;
+            const siteFilter = document.getElementById("reg-site-filter").value;
+            document.querySelectorAll(".registry-row").forEach(row => {
                 const textMatches = row.textContent.toLowerCase().includes(searchTerm);
-                const rowType = row.getAttribute('data-type');
-                const typeMatches = (filterValue === 'ALL') || (rowType === filterValue);
-                row.style.display = (textMatches && typeMatches) ? '' : 'none';
+                const typeMatches = typeFilter === "ALL" || row.dataset.type === typeFilter;
+                const siteMatches = siteFilter === "ALL" || row.dataset.site === siteFilter;
+                row.style.display = textMatches && typeMatches && siteMatches ? "" : "none";
             });
         }
 
-        document.getElementById('reg-search').addEventListener('input', runFilters);
-        document.getElementById('reg-filter').addEventListener('change', runFilters);
+        document.querySelectorAll(".field-toggle").forEach(button => {
+            button.addEventListener("click", () => {
+                const details = document.getElementById(button.getAttribute("aria-controls"));
+                const isExpanded = button.getAttribute("aria-expanded") === "true";
+                document.querySelectorAll(".field-toggle").forEach(otherButton => {
+                    otherButton.setAttribute("aria-expanded", "false");
+                    document.getElementById(otherButton.getAttribute("aria-controls")).hidden = true;
+                });
+                if (!isExpanded) {
+                    button.setAttribute("aria-expanded", "true");
+                    details.hidden = false;
+                }
+            });
+        });
+
+        document.querySelectorAll(".template-copy").forEach(button => {
+            button.addEventListener("click", () => {
+                navigator.clipboard.writeText(button.dataset.template).then(() => {
+                    button.textContent = "Copied";
+                    window.setTimeout(() => { button.textContent = "Copy"; }, 1500);
+                });
+            });
+        });
+
+        const quickSearchInput = document.getElementById("quick-search-filter");
+        const quickSearchStatus = document.getElementById("quick-search-status");
+        const quickSearchItems = Array.from(document.querySelectorAll(".quick-search-item"));
+        const initialQuickSearchLimit = 30;
+
+        function runQuickSearch() {
+            const query = quickSearchInput.value.trim().toLowerCase();
+            let matches = 0;
+            quickSearchItems.forEach(button => {
+                const matchesQuery = button.dataset.quickSearch.toLowerCase().includes(query);
+                const withinInitialLimit = query || Number(button.dataset.quickIndex) < initialQuickSearchLimit;
+                const isVisible = matchesQuery && withinInitialLimit;
+                button.hidden = !isVisible;
+                if (matchesQuery) matches += 1;
+            });
+            quickSearchStatus.textContent = query
+                ? `${matches} matching component${matches === 1 ? "" : "s"}`
+                : `Showing the first ${Math.min(initialQuickSearchLimit, matches)} of ${matches} components. Type to narrow the list.`;
+        }
+
+        document.querySelectorAll(".quick-search-item").forEach(button => {
+            button.addEventListener("click", () => {
+                document.getElementById("reg-search").value = button.dataset.search;
+                document.getElementById("reg-filter").value = button.dataset.type;
+                document.getElementById("registry-filter-form").submit();
+            });
+        });
+        quickSearchInput.addEventListener("input", runQuickSearch);
+        document.querySelector(".quick-search").addEventListener("toggle", event => {
+            if (event.target.open) quickSearchInput.focus();
+        });
+        runQuickSearch();
+
+        if (document.getElementById("registry-table")) {
+            document.getElementById("reg-search").addEventListener("input", runFilters);
+            document.getElementById("reg-filter").addEventListener("change", runFilters);
+            document.getElementById("reg-site-filter").addEventListener("change", runFilters);
+        }
     </script>
 {% endblock %}
