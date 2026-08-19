@@ -120,15 +120,16 @@
             <input id="quick-search-filter" class="quick-search-filter" type="search" placeholder="Search pages and blocks..." autocomplete="off">
             <span id="quick-search-status" class="quick-search-status" aria-live="polite"></span>
             <div class="quick-search-list" aria-label="Quick registry search">
-                {% for component_type, component_name, display_name in quick_search_items %}
-                    <button type="button" class="quick-search-item" data-search="{{ component_name }}" data-type="{{ component_type }}" data-quick-search="{{ component_name }} {{ display_name }}" data-quick-index="{{ forloop.counter0 }}">
-                        <span class="type-tag type-tag--{{ component_type|lower }}">{{ component_type }}</span>{{ display_name }}
+                {% for item in quick_search_items %}
+                    <button type="button" class="quick-search-item" data-search="{{ item.hierarchy }}" data-type="{{ item.component_type }}" data-definition="{{ item.definition_id }}">
+                        <span class="type-tag type-tag--{{ item.component_type|lower }}">{{ item.component_type }}</span>{{ item.hierarchy }}
                     </button>
                 {% endfor %}
             </div>
         </details>
         <form id="registry-filter-form" method="get" class="registry-controls">
             <input type="hidden" name="apply" value="1">
+            <input id="definition-filter" type="hidden" name="definition" value="{{ filters.definition }}">
             <div class="registry-search"><label for="reg-search">Search Registry</label><input type="search" id="reg-search" name="q" value="{{ filters.q }}" placeholder="Name, field or site..."></div>
             <div><label for="reg-filter">Component Type</label><select id="reg-filter" name="type"><option value="ALL" {% if filters.type == "ALL" %}selected{% endif %}>All</option><option value="PAGE" {% if filters.type == "PAGE" %}selected{% endif %}>Pages</option><option value="BLOCK" {% if filters.type == "BLOCK" %}selected{% endif %}>Blocks</option></select></div>
             <div><label for="reg-site-filter">Site</label><select id="reg-site-filter" name="site"><option value="">All sites</option>{% for site in sites %}<option value="{{ site.id }}" {% if filters.site == site.id|stringformat:"s" %}selected{% endif %}>{{ site.site_name }}</option>{% endfor %}</select></div>
@@ -179,21 +180,15 @@
                             {% endfor %}
                         </div>
                     </td>
-                    <td class="col-centered" data-sort="{{ item.usage.draft }}">
-                        <span class="{% if item.usage.draft > 0 %}count-draft{% else %}zero-usage{% endif %}">{{ item.usage.draft }}</span>
-                    </td>
-                    <td class="col-centered" data-sort="{{ item.usage.live }}">
-                        <span class="{% if item.usage.live > 0 %}count-live{% else %}zero-usage{% endif %}">{{ item.usage.live }}</span>
-                    </td>
-                    <td class="col-centered" data-sort="{{ item.usage.total }}">
-                        {% if item.usage.total > 0 %}
-                            <a href="{% url 'dev_usage_detail' item.type item.clean_name %}?site={{ item.site_id }}" class="button button-small usage-link">
-                                {{ item.usage.total }}
-                            </a>
-                        {% else %}
-                            <span class="zero-usage">0</span>
-                        {% endif %}
-                    </td>
+                    {% if usage_requested %}
+                        <td class="col-centered" data-sort="{{ item.usage.draft }}"><span class="{% if item.usage.draft > 0 %}count-draft{% else %}zero-usage{% endif %}">{{ item.usage.draft }}</span></td>
+                        <td class="col-centered" data-sort="{{ item.usage.live }}"><span class="{% if item.usage.live > 0 %}count-live{% else %}zero-usage{% endif %}">{{ item.usage.live }}</span></td>
+                        <td class="col-centered" data-sort="{{ item.usage.total }}">{% if item.usage.total > 0 %}<a href="{% url 'dev_definition_usage' item.definition_id %}{% if item.site_id %}?site={{ item.site_id }}{% endif %}" class="button button-small usage-link">{{ item.usage.total }}</a>{% else %}<span class="zero-usage">0</span>{% endif %}</td>
+                    {% else %}
+                        <td class="col-centered"><span class="template-empty">—</span></td>
+                        <td class="col-centered"><span class="template-empty">—</span></td>
+                        <td class="col-centered"><span class="template-empty">Add min or max</span></td>
+                    {% endif %}
                     <td>
                         {% if item.template %}
                             <span class="template-label" title="{{ item.template }}">{{ item.template_label }}</span>
@@ -206,6 +201,13 @@
                 {% endfor %}
             </tbody>
         </table>
+        {% if page_obj.paginator.num_pages > 1 %}
+            <nav class="pagination" aria-label="Registry result pages">
+                {% if page_obj.has_previous %}<a class="button" href="?apply=1&amp;q={{ filters.q|urlencode }}&amp;type={{ filters.type|urlencode }}&amp;site={{ filters.site|urlencode }}&amp;min_usage={{ filters.min_usage|urlencode }}&amp;max_usage={{ filters.max_usage|urlencode }}&amp;definition={{ filters.definition|urlencode }}&amp;page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+                <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} results)</span>
+                {% if page_obj.has_next %}<a class="button" href="?apply=1&amp;q={{ filters.q|urlencode }}&amp;type={{ filters.type|urlencode }}&amp;site={{ filters.site|urlencode }}&amp;min_usage={{ filters.min_usage|urlencode }}&amp;max_usage={{ filters.max_usage|urlencode }}&amp;definition={{ filters.definition|urlencode }}&amp;page={{ page_obj.next_page_number }}">Next</a>{% endif %}
+            </nav>
+        {% endif %}
         {% else %}
             <p class="help-block">Choose filters and select <strong>Apply Filters</strong> to load registry usage.</p>
         {% endif %}
@@ -273,41 +275,76 @@
 
         const quickSearchInput = document.getElementById("quick-search-filter");
         const quickSearchStatus = document.getElementById("quick-search-status");
-        const quickSearchItems = Array.from(document.querySelectorAll(".quick-search-item"));
-        const initialQuickSearchLimit = 30;
+        const quickSearchList = document.querySelector(".quick-search-list");
+        const definitionFilter = document.getElementById("definition-filter");
+        let quickSearchTimer;
+        let quickSearchController;
 
-        function runQuickSearch() {
-            const query = quickSearchInput.value.trim().toLowerCase();
-            let matches = 0;
-            quickSearchItems.forEach(button => {
-                const matchesQuery = button.dataset.quickSearch.toLowerCase().includes(query);
-                const withinInitialLimit = query || Number(button.dataset.quickIndex) < initialQuickSearchLimit;
-                const isVisible = matchesQuery && withinInitialLimit;
-                button.hidden = !isVisible;
-                if (matchesQuery) matches += 1;
-            });
-            quickSearchStatus.textContent = query
-                ? `${matches} matching component${matches === 1 ? "" : "s"}`
-                : `Showing the first ${Math.min(initialQuickSearchLimit, matches)} of ${matches} components. Type to narrow the list.`;
+        function selectQuickItem(button) {
+            document.getElementById("reg-search").value = button.dataset.search;
+            document.getElementById("reg-filter").value = button.dataset.type;
+            definitionFilter.value = button.dataset.definition;
+            document.getElementById("registry-filter-form").submit();
         }
 
-        document.querySelectorAll(".quick-search-item").forEach(button => {
-            button.addEventListener("click", () => {
-                document.getElementById("reg-search").value = button.dataset.search;
-                document.getElementById("reg-filter").value = button.dataset.type;
-                document.getElementById("registry-filter-form").submit();
+        function bindQuickItems() {
+            quickSearchList.querySelectorAll(".quick-search-item").forEach(button => {
+                button.addEventListener("click", () => selectQuickItem(button));
             });
+        }
+
+        function renderQuickItems(results, total) {
+            quickSearchList.replaceChildren();
+            results.forEach(item => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "quick-search-item";
+                button.dataset.search = item.name;
+                button.dataset.type = item.type;
+                button.dataset.definition = item.id;
+                const badge = document.createElement("span");
+                badge.className = `type-tag type-tag--${item.type.toLowerCase()}`;
+                badge.textContent = item.type;
+                button.append(badge, document.createTextNode(item.name));
+                quickSearchList.appendChild(button);
+            });
+            quickSearchStatus.textContent = total > results.length
+                ? `Showing ${results.length} of ${total} matching components.`
+                : `${total} matching component${total === 1 ? "" : "s"}.`;
+            bindQuickItems();
+        }
+
+        async function loadQuickItems() {
+            if (quickSearchController) quickSearchController.abort();
+            quickSearchController = new AbortController();
+            const query = quickSearchInput.value.trim();
+            const params = new URLSearchParams({q: query, limit: "30"});
+            try {
+                const response = await fetch(`{% url 'dev_catalog_search' %}?${params}`, {
+                    headers: {"X-Requested-With": "XMLHttpRequest"},
+                    signal: quickSearchController.signal,
+                });
+                if (!response.ok) throw new Error("Catalog search failed");
+                const data = await response.json();
+                renderQuickItems(data.results, data.total);
+            } catch (error) {
+                if (error.name !== "AbortError") {
+                    quickSearchStatus.textContent = "Could not load components.";
+                }
+            }
+        }
+
+        bindQuickItems();
+        quickSearchStatus.textContent = "Showing the first 30 components. Type to search all definitions.";
+        quickSearchInput.addEventListener("input", () => {
+            window.clearTimeout(quickSearchTimer);
+            quickSearchTimer = window.setTimeout(loadQuickItems, 200);
         });
-        quickSearchInput.addEventListener("input", runQuickSearch);
+        document.getElementById("reg-search").addEventListener("input", () => {
+            definitionFilter.value = "";
+        });
         document.querySelector(".quick-search").addEventListener("toggle", event => {
             if (event.target.open) quickSearchInput.focus();
         });
-        runQuickSearch();
-
-        if (document.getElementById("registry-table")) {
-            document.getElementById("reg-search").addEventListener("input", runFilters);
-            document.getElementById("reg-filter").addEventListener("change", runFilters);
-            document.getElementById("reg-site-filter").addEventListener("change", runFilters);
-        }
     </script>
 {% endblock %}

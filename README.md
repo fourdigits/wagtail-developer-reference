@@ -6,16 +6,18 @@
 In large Wagtail projects, it’s easy to lose track of where specific blocks are used or which templates are being rendered. This tool gives you a "God-view" of your components without needing to dig through the database or shell.
 
 ## Features
-* **On-demand usage tracking:** Apply filters before calculating page and block usage, keeping the registry quick to open.
-* **Interactive registry:** Combine text, PAGE/BLOCK, site and total-usage-range filters to find exactly the components you need.
-* **Nested block discovery:** Browse visible block labels and full nested definition paths, with safe fallbacks for unlabeled blocks.
-* **Usage inspection:** Search and paginate matching pages, then copy the visible usage table in one click.
+* **Fast registry:** Code definitions are cached per worker; the normal registry response stays small and paginates at 20 rows.
+* **On-demand exact usage:** PAGE and BLOCK counts are calculated only for a usage range, scoped to the exact page model, StreamField and nested definition path.
+* **Scalable StreamField inspection:** Usage scans read raw StreamField JSON, avoiding chooser-object queries while keeping totals current.
+* **Searchable block picker:** An accessible, collapsed picker searches all definitions server-side and returns at most 30 choices at once.
+* **Multi-site aware:** Site root pages are included, nested subsites are excluded from parent-site counts, and an empty site filter aggregates globally.
+* **Usage inspection:** Open an exact definition's paginated page list and copy the visible usage table in one click.
 * **Template discovery:** See the template path associated with every component.
 
 ## Installation
 
-Compatibility: Python 3.9+ and Wagtail 4.1 through 7.4.2 LTS (the latest
-stable Wagtail release at v0.1.3). Wagtail 7.4 itself requires Python 3.10+.
+Compatibility: Python 3.9+ and Wagtail 4.1 through 7.4.2 LTS. Wagtail 7.4
+itself requires Python 3.10+.
 
 1. Add \`wagtail_developer_reference\` to your \`INSTALLED_APPS\`:
    \`\`\`python

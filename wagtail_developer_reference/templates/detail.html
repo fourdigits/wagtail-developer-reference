@@ -129,7 +129,7 @@
       <div class="breadcrumb">
         <a href="{% url 'dev_reference' %}">&larr; Back to System Registry</a>
       </div>
-      <h1>Locations for: <strong>{{ component_name }}</strong></h1>
+      <h1>Usage: <strong>{{ component_name }}</strong></h1>
       <p>{{ page_obj.paginator.count }} location{{ page_obj.paginator.count|pluralize }} found</p>
     </div>
   </header>
@@ -159,14 +159,14 @@
           <tr class="usage-row">
             <td>
               <strong class="page-title">{{ page.title }}</strong>
-              <small class="page-type">Type: {{ page.get_verbose_name }}</small>
+              <small class="page-type">Type: {{ page.content_type.name|title }}</small>
             </td>
             <td class="td-status" data-sort="{% if page.live %}1{% else %}0{% endif %}">
               <span class="status-tag status-tag--{% if page.live %}live{% else %}draft{% endif %}">
                 {% if page.live %}Live{% else %}Draft{% endif %}
               </span>
             </td>
-            <td><code class="url-code">{{ page.url|default:"/(no slug)/" }}</code></td>
+            <td><code class="url-code">{{ page.url_path|default:"/(no path)/" }}</code></td>
             <td class="col-actions">
               <a href="{% url 'wagtailadmin_pages:edit' page.id %}" class="button button-small edit-button" target="_blank">Edit Page</a>
             </td>
