@@ -98,6 +98,25 @@
 
     .empty-state p { font-size: 1.2rem; }
 
+    .registry-controls {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        align-items: end;
+    }
+
+    .registry-controls {
+        background: #333; border-left: 0.3125rem solid #dcbd3d; padding: 1rem;
+    }
+    .registry-controls div:first-of-type { flex: 1; }
+    .registry-controls label { color: white; display: block; font-weight: bold; margin-bottom: 0.5rem; }
+    .registry-controls input {
+        background: #222; border: 0.0625rem solid #dcbd3d; box-sizing: border-box;
+        color: white; min-height: 2.5rem; padding: 0.6rem; width: 100%;
+    }
+    .usage-table-actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
+    .copy-table-button { border-radius: 0; }
+
     [data-wagtail-theme="dark"] .listing tbody tr:hover {
         background-color: #333 !important;
     }
@@ -110,12 +129,22 @@
       <div class="breadcrumb">
         <a href="{% url 'dev_reference' %}">&larr; Back to System Registry</a>
       </div>
-      <h1>Locations for: <strong>{{ component_name }}</strong></h1>
-      <p>Found in {{ pages|length }} location{{ pages|length|pluralize }}</p>
+      <h1>Usage: <strong>{{ component_name }}</strong></h1>
+      <p>{{ page_obj.paginator.count }} location{{ page_obj.paginator.count|pluralize }} found</p>
     </div>
   </header>
 
   <div class="nice-padding">
+    <form method="get" class="registry-controls" role="search">
+      <input type="hidden" name="site" value="{{ site_filter }}">
+      <div>
+        <label for="usage-search">Search pages</label>
+        <input id="usage-search" type="search" name="q" value="{{ search_query }}" placeholder="Filter by page title or slug...">
+      </div>
+      <div>
+        <button type="submit" class="button">Search</button>
+      </div>
+    </form>
     <table class="listing" id="usage-table">
       <thead>
         <tr>
@@ -130,14 +159,14 @@
           <tr class="usage-row">
             <td>
               <strong class="page-title">{{ page.title }}</strong>
-              <small class="page-type">Type: {{ page.get_verbose_name }}</small>
+              <small class="page-type">Type: {{ page.content_type.name|title }}</small>
             </td>
             <td class="td-status" data-sort="{% if page.live %}1{% else %}0{% endif %}">
               <span class="status-tag status-tag--{% if page.live %}live{% else %}draft{% endif %}">
                 {% if page.live %}Live{% else %}Draft{% endif %}
               </span>
             </td>
-            <td><code class="url-code">{{ page.url|default:"/(no slug)/" }}</code></td>
+            <td><code class="url-code">{{ page.url_path|default:"/(no path)/" }}</code></td>
             <td class="col-actions">
               <a href="{% url 'wagtailadmin_pages:edit' page.id %}" class="button button-small edit-button" target="_blank">Edit Page</a>
             </td>
@@ -151,11 +180,37 @@
         {% endfor %}
       </tbody>
     </table>
+    <div class="usage-table-actions">
+      <button id="copy-usage-table" type="button" class="button button-secondary copy-table-button">Copy displayed table</button>
+    </div>
+    {% if page_obj.paginator.num_pages > 1 %}
+      <nav class="pagination" aria-label="Usage result pages">
+        {% if page_obj.has_previous %}
+          <a class="button" href="?site={{ site_filter|urlencode }}&amp;q={{ search_query|urlencode }}&amp;page={{ page_obj.previous_page_number }}">Previous</a>
+        {% endif %}
+        <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+          <a class="button" href="?site={{ site_filter|urlencode }}&amp;q={{ search_query|urlencode }}&amp;page={{ page_obj.next_page_number }}">Next</a>
+        {% endif %}
+      </nav>
+    {% endif %}
   </div>
 
   <script>
     let currentSortCol = -1;
     let sortAsc = true;
+
+    function copyUsageTable() {
+        const headers = ["Page Title", "Status", "URL Path"];
+        const rows = Array.from(document.querySelectorAll("#usage-body .usage-row"));
+        const values = rows.map(row => [0, 1, 2].map(index => row.cells[index].innerText.trim().replace(/\s+/g, " ")));
+        const text = [headers, ...values].map(row => row.join("\t")).join("\n");
+        const button = document.getElementById("copy-usage-table");
+        navigator.clipboard.writeText(text).then(() => {
+            button.textContent = "Copied";
+            window.setTimeout(() => { button.textContent = "Copy displayed table"; }, 1500);
+        });
+    }
 
     function sortTable(colIdx) {
         const tbody = document.getElementById("usage-body");
@@ -173,12 +228,14 @@
             if (colIdx === 1) {
                 valA = parseInt(a.cells[colIdx].getAttribute('data-sort'));
                 valB = parseInt(b.cells[colIdx].getAttribute('data-sort'));
-                return sortAsc ? valA - valB : valB - valueA;
+                return sortAsc ? valA - valB : valB - valA;
             }
             valA = a.cells[colIdx].textContent.trim().toLowerCase();
             valB = b.cells[colIdx].textContent.trim().toLowerCase();
             return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
         }).forEach(row => tbody.appendChild(row));
     }
+
+    document.getElementById("copy-usage-table").addEventListener("click", copyUsageTable);
   </script>
 {% endblock %}
