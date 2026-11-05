@@ -25,5 +25,20 @@ In large Wagtail projects, it’s easy to lose track of where specific blocks ar
    * Login to the Wagtail Admin as a **superuser**.
    * Find the **"System Registry"** item in the sidebar menu.
 
+## Settings
+
+### `WAGTAIL_DEVELOPER_REFERENCE_ALLOW_ALL_ADMIN_USERS`
+
+Defaults to `False`, preserving superuser-only access. Set this to `True` in
+your Django settings to allow all users with access to the Wagtail admin
+(`wagtailadmin.access_admin`) to open both the registry and usage detail pages,
+without granting any additional permissions:
+
+```python
+WAGTAIL_DEVELOPER_REFERENCE_ALLOW_ALL_ADMIN_USERS = True
+```
+
+Users without Wagtail admin access remain unable to access the Developer Reference.
+
 ## License
 **Internal Use Only** - Copyright © 2026 Fourdigits. All rights reserved.

@@ -1,5 +1,6 @@
 import inspect
 
+from django.conf import settings
 from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import render
@@ -12,8 +13,14 @@ from wagtail.fields import StreamField
 from wagtail.models import Site, get_page_models
 
 
-def is_superuser(user):
+def has_developer_reference_access(user):
     if user.is_superuser:
+        return True
+    if (
+        getattr(settings, "WAGTAIL_DEVELOPER_REFERENCE_ALLOW_ALL_ADMIN_USERS", False)
+        and user.is_authenticated
+        and user.has_perm("wagtailadmin.access_admin")
+    ):
         return True
     raise PermissionDenied
 
@@ -139,7 +146,7 @@ class WagtailAuditor:
         return self.results
 
 
-@user_passes_test(is_superuser)
+@user_passes_test(has_developer_reference_access)
 def developer_reference_view(request):
     auditor = WagtailAuditor()
     audit_results = auditor.run()
@@ -147,7 +154,7 @@ def developer_reference_view(request):
     return render(request, "index.html", {"audit_data": sorted_results})
 
 
-@user_passes_test(is_superuser)
+@user_passes_test(has_developer_reference_access)
 def developer_usage_detail_view(request, component_type, component_name):
     site_filter_name = request.GET.get('site')
     found_pages = []
