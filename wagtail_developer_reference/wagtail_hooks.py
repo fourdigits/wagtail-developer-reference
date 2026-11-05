@@ -4,6 +4,7 @@ import inspect
 from collections.abc import Iterable
 from typing import Any, Literal, TypedDict
 
+from django.conf import settings
 from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import PermissionDenied
 from django.db.models import Field
@@ -54,6 +55,9 @@ def user_can_access_developer_reference(user: Any) -> bool:
         return False
     if not getattr(user, "is_active", False):
         return False
+
+    if getattr(settings, "WAGTAIL_DEVELOPER_REFERENCE_ALLOW_ALL_ADMIN_USERS", False):
+        return user.has_perm("wagtailadmin.access_admin")
 
     user_has_permission = user.user_permissions.filter(
         codename=ACCESS_PERMISSION_CODENAME,

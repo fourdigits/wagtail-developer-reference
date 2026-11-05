@@ -43,5 +43,24 @@ By default, no account can see the menu item or access the URLs. Superusers are 
 granted access automatically by this package; assign the permission directly or
 through a group.
 
+## Settings
+
+### `WAGTAIL_DEVELOPER_REFERENCE_ALLOW_ALL_ADMIN_USERS`
+
+Default: `False`.
+
+Set this to `True` in your Django settings to allow all active, authenticated
+users with access to the Wagtail admin (`wagtailadmin.access_admin`) to see the
+**System Registry** menu item and access the Developer Reference URLs, without
+assigning the additional Developer Reference permission:
+
+```python
+WAGTAIL_DEVELOPER_REFERENCE_ALLOW_ALL_ADMIN_USERS = True
+```
+
+This includes active superusers. When omitted or set to `False`, the explicit
+user or group permission described above is still required, including for
+superusers.
+
 ## License
 **Internal Use Only** - Copyright © 2026 Fourdigits. All rights reserved.
