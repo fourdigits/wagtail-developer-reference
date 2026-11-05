@@ -39,6 +39,24 @@
     }
     .quick-search-item .type-tag { margin-right: 0.35rem; }
     .registry-controls label { display: block; font-weight: bold; color: white; margin-bottom: 0.5rem; }
+    .registry-controls .usage-label { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.5rem; }
+    .registry-controls .usage-label label { margin-bottom: 0; }
+    .usage-help { position: relative; display: inline-flex; }
+    .usage-help-icon {
+        background: transparent; border: 1px solid currentColor; border-radius: 50%;
+        color: white; cursor: help; font: bold 0.8rem serif;
+        width: 1.25rem; height: 1.25rem; padding: 0;
+    }
+    .usage-help-icon:focus-visible { outline: 2px solid #dcbd3d; outline-offset: 2px; }
+    .usage-help-tooltip {
+        display: none; position: absolute; top: 100%; right: 0; z-index: 20;
+        width: 16rem; max-width: calc(100vw - 3rem); padding: 0.75rem;
+        background: #222; border: 1px solid #dcbd3d; color: white;
+        font-size: 0.875rem; font-weight: normal; line-height: 1.5;
+    }
+    .usage-help:hover .usage-help-tooltip,
+    .usage-help:focus-within .usage-help-tooltip { display: block; }
+    .usage-help-tooltip[hidden] { display: none; }
     .registry-controls input, .registry-controls select {
         box-sizing: border-box; height: 2.5rem; width: 100%;
         border: 1px solid #dcbd3d; background: #333; color: white; border-radius: 0;
@@ -133,7 +151,16 @@
             <div class="registry-search"><label for="reg-search">Search Registry</label><input type="search" id="reg-search" name="q" value="{{ filters.q }}" placeholder="Name, field or site..."></div>
             <div><label for="reg-filter">Component Type</label><select id="reg-filter" name="type"><option value="ALL" {% if filters.type == "ALL" %}selected{% endif %}>All</option><option value="PAGE" {% if filters.type == "PAGE" %}selected{% endif %}>Pages</option><option value="BLOCK" {% if filters.type == "BLOCK" %}selected{% endif %}>Blocks</option></select></div>
             <div><label for="reg-site-filter">Site</label><select id="reg-site-filter" name="site"><option value="">All sites</option>{% for site in sites %}<option value="{{ site.id }}" {% if filters.site == site.id|stringformat:"s" %}selected{% endif %}>{{ site.site_name }}</option>{% endfor %}</select></div>
-            <div class="usage-range"><label for="min-usage">Min usage</label><input id="min-usage" type="number" min="0" name="min_usage" value="{{ filters.min_usage }}"></div>
+            <div class="usage-range">
+                <span class="usage-label">
+                    <label for="min-usage">Min usage</label>
+                    <span class="usage-help">
+                        <button id="min-usage-help" class="usage-help-icon" type="button" aria-label="About Min usage" aria-describedby="min-usage-tooltip"><span aria-hidden="true">i</span></button>
+                        <span id="min-usage-tooltip" class="usage-help-tooltip" role="tooltip">Usage counts for pages, blocks, images and documents are only shown when Min usage is filled in. Enter 0 to include items with no usage, then apply the filters.</span>
+                    </span>
+                </span>
+                <input id="min-usage" type="number" min="0" name="min_usage" value="{{ filters.min_usage }}" aria-describedby="min-usage-tooltip">
+            </div>
             <div class="usage-range"><label for="max-usage">Max usage</label><input id="max-usage" type="number" min="0" name="max_usage" value="{{ filters.max_usage }}"></div>
             <div class="filter-actions"><button type="submit" class="button">Apply Filters</button><a class="button button-secondary" href="{% url 'dev_reference' %}">Clear</a></div>
         </form>
@@ -214,6 +241,23 @@
     </div>
 
     <script>
+        const usageHelp = document.getElementById("min-usage-help");
+        const usageTooltip = document.getElementById("min-usage-tooltip");
+        ["mouseenter", "focus", "click"].forEach(eventName => {
+            usageHelp.addEventListener(eventName, () => {
+                usageTooltip.hidden = false;
+                usageTooltip.style.transform = "";
+                const tooltipLeft = usageTooltip.getBoundingClientRect().left;
+                if (tooltipLeft < 16) {
+                    usageTooltip.style.transform = `translateX(${16 - tooltipLeft}px)`;
+                }
+            });
+        });
+        window.addEventListener("resize", () => { usageTooltip.hidden = true; });
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape") usageTooltip.hidden = true;
+        });
+
         let currentSortColumn = -1;
         let isSortAscending = true;
 
