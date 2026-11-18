@@ -7,14 +7,16 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - python: "3.9"
+          - os: ubuntu-22.04
+            python: "3.9"
             wagtail: ">=4.1,<4.2"
-          - python: "3.13"
+          - os: ubuntu-latest
+            python: "3.13"
             wagtail: ">=4.1"
     steps:
       - uses: actions/checkout@v4
