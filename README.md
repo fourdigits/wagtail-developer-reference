@@ -16,8 +16,9 @@ In large Wagtail projects, it’s easy to lose track of where specific blocks ar
 
 ## Installation
 
-Compatibility: Python 3.9+ and Wagtail 4.1 through 7.4.2 LTS. Wagtail 7.4
-itself requires Python 3.10+.
+Compatibility: Python 3.9+ and Wagtail 4.1 or later, without an upper Wagtail
+version limit. Newer Wagtail releases may require a newer Python version.
+CI tests the minimum Wagtail series and the latest compatible release.
 
 1. Add \`wagtail_developer_reference\` to your \`INSTALLED_APPS\`:
    \`\`\`python
