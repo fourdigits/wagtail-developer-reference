@@ -1,0 +1,36 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            python: "3.9"
+            wagtail: ">=4.1,<4.2"
+          - os: ubuntu-latest
+            python: "3.13"
+            wagtail: ">=4.1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install "wagtail${{ matrix.wagtail }}" -e ".[dev]" build twine
+      - run: python -m django check --settings=wagtail_developer_reference.tests.settings
+      - run: python -m django makemigrations --check --dry-run --settings=wagtail_developer_reference.tests.settings
+      - run: ruff check .
+      - run: >-
+          ruff format --check setup.py wagtail_developer_reference/__init__.py
+          wagtail_developer_reference/tests/settings.py wagtail_developer_reference/tests/urls.py
+      - run: pytest
+      - run: python -m build
+      - run: python -m twine check dist/*
